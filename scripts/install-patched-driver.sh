@@ -27,7 +27,15 @@ if [ ! -f "$PATCH_FILE" ]; then
   exit 1
 fi
 
-# ── 3. Remove existing driver if present ─────────────────────────────────────
+# ── 3. Uninstall existing driver if registered with Appium ───────────────────
+if appium driver list --installed 2>&1 | grep -q "webos"; then
+  echo ""
+  echo "→ Uninstalling existing webos driver from Appium..."
+  appium driver uninstall webos 2>&1 || true
+  echo "✔ Uninstalled from Appium"
+fi
+
+# Remove existing driver directory if present
 if [ -d "$DRIVER_DIR" ]; then
   echo ""
   echo "→ Removing existing driver at $DRIVER_DIR..."
