@@ -27,20 +27,31 @@ if [ ! -f "$PATCH_FILE" ]; then
   exit 1
 fi
 
-# ── 3. Uninstall existing driver if registered with Appium ───────────────────
-if appium driver list --installed 2>&1 | grep -q "webos"; then
-  echo ""
-  echo "→ Uninstalling existing webos driver from Appium..."
-  appium driver uninstall webos 2>&1 || true
-  echo "✔ Uninstalled from Appium"
-fi
+# ── 3. Remove existing webos driver (yaml + directory) ───────────────────────
+echo ""
+echo "→ Removing existing webos driver entries..."
 
-# Remove existing driver directory if present
+# Remove from both extensions.yaml locations using python3 (always available on macOS)
+for YAML_FILE in \
+  "$HOME/.appium/extensions.yaml" \
+  "$HOME/.appium/node_modules/.cache/appium/extensions.yaml"; do
+  if [ -f "$YAML_FILE" ]; then
+    python3 -c "
+import yaml, sys
+with open('$YAML_FILE') as f: doc = yaml.safe_load(f) or {}
+if doc.get('drivers', {}).pop('webos', None) is not None:
+    with open('$YAML_FILE', 'w') as f: yaml.dump(doc, f, default_flow_style=False)
+    print('  ✔ Removed webos from $YAML_FILE')
+else:
+    print('  – webos not found in $YAML_FILE')
+" 2>/dev/null || true
+  fi
+done
+
+# Remove existing driver directory
 if [ -d "$DRIVER_DIR" ]; then
-  echo ""
-  echo "→ Removing existing driver at $DRIVER_DIR..."
   rm -rf "$DRIVER_DIR"
-  echo "✔ Removed"
+  echo "  ✔ Removed $DRIVER_DIR"
 fi
 
 # ── 4. Install the published driver globally ──────────────────────────────────
