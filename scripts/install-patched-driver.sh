@@ -36,7 +36,7 @@ echo "✔ Installed to: $DRIVER_DIR"
 # ── 4. Apply patch ───────────────────────────────────────────────────────────
 echo ""
 echo "→ Step 2/3 – Applying patch..."
-cd "$DRIVER_DIR"
+pushd "$DRIVER_DIR" > /dev/null
 
 # Dry-run first to detect any issues
 if ! patch --dry-run -p1 --forward < "$PATCH_FILE" > /dev/null 2>&1; then
@@ -50,15 +50,18 @@ patch -p1 --forward --reject-file=/tmp/webos-driver.rej < "$PATCH_FILE" && {
   if [ $EXIT -eq 1 ] && [ -f /tmp/webos-driver.rej ]; then
     echo "✖ Some hunks failed to apply. Rejected hunks saved to /tmp/webos-driver.rej"
     cat /tmp/webos-driver.rej
+    popd > /dev/null
     exit 1
   fi
 }
 
 # Fix version in package.json to 0.6.0
-sed -i '' 's/"version": "0.5.0"/"version": "0.6.0"/' package.json 2>/dev/null || \
-  sed -i 's/"version": "0.5.0"/"version": "0.6.0"/' package.json
+sed -i '' 's/"version": "0.5.0"/"version": "0.6.0"/' "$DRIVER_DIR/package.json" 2>/dev/null || \
+  sed -i 's/"version": "0.5.0"/"version": "0.6.0"/' "$DRIVER_DIR/package.json"
 
 echo "✔ Version bumped to 0.6.0 in $DRIVER_DIR/package.json"
+
+popd > /dev/null
 
 # ── 5. Register with Appium ──────────────────────────────────────────────────
 echo ""
