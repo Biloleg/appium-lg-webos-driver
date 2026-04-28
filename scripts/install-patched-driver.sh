@@ -27,9 +27,9 @@ if [ ! -f "$PATCH_FILE" ]; then
   exit 1
 fi
 
-# ── 3. Remove existing webos driver (yaml + directory) ───────────────────────
+# ── 3. Remove existing webos driver (yaml + both directories) ────────────────
 echo ""
-echo "→ Removing existing webos driver entries..."
+echo "→ Removing existing webos driver..."
 
 # Remove from both extensions.yaml locations using python3 (always available on macOS)
 for YAML_FILE in \
@@ -43,12 +43,19 @@ if doc.get('drivers', {}).pop('webos', None) is not None:
     with open('$YAML_FILE', 'w') as f: yaml.dump(doc, f, default_flow_style=False)
     print('  ✔ Removed webos from $YAML_FILE')
 else:
-    print('  – webos not found in $YAML_FILE')
+    print('  - webos not found in $YAML_FILE')
 " 2>/dev/null || true
   fi
 done
 
-# Remove existing driver directory
+# Remove from ~/.appium/node_modules (Appium's own install location)
+APPIUM_DRIVER_DIR="$HOME/.appium/node_modules/appium-lg-webos-driver"
+if [ -d "$APPIUM_DRIVER_DIR" ]; then
+  rm -rf "$APPIUM_DRIVER_DIR"
+  echo "  ✔ Removed $APPIUM_DRIVER_DIR"
+fi
+
+# Remove from global npm prefix
 if [ -d "$DRIVER_DIR" ]; then
   rm -rf "$DRIVER_DIR"
   echo "  ✔ Removed $DRIVER_DIR"
