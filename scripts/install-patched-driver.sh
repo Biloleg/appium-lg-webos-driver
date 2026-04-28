@@ -27,7 +27,15 @@ if [ ! -f "$PATCH_FILE" ]; then
   exit 1
 fi
 
-# ── 3. Install the published driver globally ─────────────────────────────────
+# ── 3. Remove existing driver if present ─────────────────────────────────────
+if [ -d "$DRIVER_DIR" ]; then
+  echo ""
+  echo "→ Removing existing driver at $DRIVER_DIR..."
+  rm -rf "$DRIVER_DIR"
+  echo "✔ Removed"
+fi
+
+# ── 4. Install the published driver globally ──────────────────────────────────
 echo ""
 echo "→ Step 1/3 – Installing appium-lg-webos-driver from npm..."
 npm install -g appium-lg-webos-driver
@@ -63,13 +71,73 @@ echo "✔ Version bumped to 0.6.0 in $DRIVER_DIR/package.json"
 
 popd > /dev/null
 
-# ── 5. Register with Appium ──────────────────────────────────────────────────
+# ── 5. Register with Appium via extensions.yaml cache ────────────────────────
 echo ""
 echo "→ Step 3/3 – Registering driver with Appium..."
-appium driver install --source=local "$DRIVER_DIR"
+
+APPIUM_CACHE_DIR="$HOME/.appium/node_modules/.cache/appium"
+APPIUM_EXT_YAML="$APPIUM_CACHE_DIR/extensions.yaml"
+mkdir -p "$APPIUM_CACHE_DIR"
+
+# Create cache yaml if it doesn't exist
+if [ ! -f "$APPIUM_EXT_YAML" ]; then
+  echo "drivers: {}" > "$APPIUM_EXT_YAML"
+  echo "plugins: {}" >> "$APPIUM_EXT_YAML"
+  echo "schemaRev: 4" >> "$APPIUM_EXT_YAML"
+fi
+
+# Remove existing webos entry if present, then append fresh entry
+node -e "
+const fs = require('fs');
+const yaml = require('js-yaml');
+const file = process.env.HOME + '/.appium/node_modules/.cache/appium/extensions.yaml';
+let doc = {};
+try { doc = yaml.load(fs.readFileSync(file, 'utf8')) || {}; } catch(e) {}
+if (!doc.drivers) doc.drivers = {};
+if (!doc.plugins) doc.plugins = {};
+if (!doc.schemaRev) doc.schemaRev = 4;
+doc.drivers.webos = {
+  pkgName: 'appium-lg-webos-driver',
+  version: '0.6.0',
+  installType: 'npm',
+  installSpec: 'appium-lg-webos-driver',
+  installPath: '$HOME/.appium/node_modules/appium-lg-webos-driver',
+  appiumVersion: '^3.0.0',
+  automationName: 'webOS',
+  platformNames: ['LGTV'],
+  mainClass: 'WebOSDriver'
+};
+fs.writeFileSync(file, yaml.dump(doc));
+console.log('✔ webos entry written to ' + file);
+" || {
+  # Fallback: append raw YAML if js-yaml not available
+  python3 -c "
+import yaml, os, sys
+file = os.path.expanduser('~/.appium/node_modules/.cache/appium/extensions.yaml')
+with open(file) as f: doc = yaml.safe_load(f) or {}
+if 'drivers' not in doc: doc['drivers'] = {}
+if 'plugins' not in doc: doc['plugins'] = {}
+if 'schemaRev' not in doc: doc['schemaRev'] = 4
+home = os.path.expanduser('~')
+doc['drivers']['webos'] = {
+  'pkgName': 'appium-lg-webos-driver',
+  'version': '0.6.0',
+  'installType': 'npm',
+  'installSpec': 'appium-lg-webos-driver',
+  'installPath': home + '/.appium/node_modules/appium-lg-webos-driver',
+  'appiumVersion': '^3.0.0',
+  'automationName': 'webOS',
+  'platformNames': ['LGTV'],
+  'mainClass': 'WebOSDriver'
+}
+with open(file, 'w') as f: yaml.dump(doc, f, default_flow_style=False)
+print('✔ webos entry written (python fallback)')
+"
+}
+
 echo ""
 echo "══════════════════════════════════════════════════"
 echo "✔ Done! appium-lg-webos-driver (patched) is ready."
 echo "══════════════════════════════════════════════════"
-appium driver list --installed 2>/dev/null | grep -i webos || true
+appium driver list --installed 2>&1 | grep -i "webos\|tizen\|uiautomator" || true
 
